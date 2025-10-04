@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EV Route Optimization</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation Header -->
+    <nav class="nav-header">
+        <div class="nav-brand">
+            <i class="fas fa-bolt"></i>
+            <span>EV Route Optimization</span>
+        </div>
+        <div class="nav-battery" id="navBattery">
+            <i class="fas fa-battery-full"></i>
+            <span id="batteryLevel">100%</span>
+        </div>
+    </nav>
+
+    <!-- Main App Container -->
+    <div class="app-layout">
+        <!-- Sidebar Panel -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-route"></i> Route Planning</h2>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+            
+            <div class="sidebar-content">
+                <!-- Input Form -->
+                <form class="route-form" id="routeForm">
+                    <div class="form-group">
+                        <div class="input-container">
+                            <input type="text" id="start" value="Visakhapatnam" required>
+                            <label for="start" class="floating-label">
+                                <i class="fas fa-play-circle"></i>
+                                Start Location
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="input-container">
+                            <input type="text" id="end" value="Hyderabad" required>
+                            <label for="end" class="floating-label">
+                                <i class="fas fa-flag-checkered"></i>
+                                Destination
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <div class="input-container">
+                                <input type="number" id="charge" value="100" min="0" max="100" required>
+                                <label for="charge" class="floating-label">
+                                    <i class="fas fa-battery-half"></i>
+                                    Battery Level
+                                </label>
+                                <span class="input-unit">%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="input-container">
+                                <input type="number" id="range" value="300" min="50" max="1000" required>
+                                <label for="range" class="floating-label">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                    Range
+                                </label>
+                                <span class="input-unit">km</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="planBtn">
+                            <i class="fas fa-search"></i>
+                            <span>Find Route</span>
+                            <div class="btn-spinner" id="btnSpinner"></div>
+                        </button>
+                        <button type="button" class="btn-secondary" id="clearBtn">
+                            <i class="fas fa-trash"></i>
+                            Clear
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Route Status -->
+                <div class="route-status" id="routeStatus" style="display: none;">
+                    <div class="status-header">
+                        <h3><i class="fas fa-route"></i> Route Status</h3>
+                    </div>
+                    <div class="status-content">
+                        <div class="status-item">
+                            <div class="status-icon battery-icon">
+                                <i class="fas fa-battery-quarter"></i>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-value" id="arrivalBattery">100%</div>
+                                <div class="status-label">Arrival Battery</div>
+                            </div>
+                        </div>
+                        
+                        <div class="status-item">
+                            <div class="status-icon charging-icon">
+                                <i class="fas fa-charging-station"></i>
+                            </div>
+                            <div class="status-info">
+                                <div class="status-value" id="chargingStops">0</div>
+                                <div class="status-label">Charging Stops</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="charging-stops-list" id="chargingStopsList">
+                        <!-- Dynamic charging stops will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Area -->
+        <main class="map-area">
+            <div class="map-container">
+                <div id="map"></div>
+                <div class="map-overlay">
+                    <button class="map-control" id="centerMap" title="Center on route">
+                        <i class="fas fa-crosshairs"></i>
+                    </button>
+                    <button class="map-control" id="toggleFullscreen" title="Toggle fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Legend Panel -->
+    <div class="legend-panel" id="legendPanel">
+        <div class="legend-header">
+            <h4><i class="fas fa-info-circle"></i> Map Legend</h4>
+            <button class="legend-toggle" id="legendToggle">
+                <i class="fas fa-chevron-up"></i>
+            </button>
+        </div>
+        <div class="legend-content" id="legendContent">
+            <div class="legend-section">
+                <h5>Route Indicators</h5>
+                <div class="legend-item">
+                    <img src="/static/icons/start.png" alt="Start" class="legend-icon">
+                    <span>Start Point</span>
+                </div>
+                <div class="legend-item">
+                    <img src="/static/icons/end.png" alt="End" class="legend-icon">
+                    <span>Destination</span>
+                </div>
+            </div>
+            
+            <div class="legend-section">
+                <h5>Charging Stations</h5>
+                <div class="legend-item">
+                    <img src="/static/icons/plug-red.png" alt="Required" class="legend-icon">
+                    <span>Required Charging Stop</span>
+                </div>
+                <div class="legend-item">
+                    <img src="/static/icons/plug-orange.png" alt="Nearby" class="legend-icon">
+                    <span>Nearby Charging Station</span>
+                </div>
+            </div>
+            
+            <div class="legend-section">
+                <h5>Battery Level</h5>
+                <div class="legend-item">
+                    <div class="battery-indicator green"></div>
+                    <span>Battery Full (60%+)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="battery-indicator yellow"></div>
+                    <span>Battery Medium (30-60%)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="battery-indicator red"></div>
+                    <span>Battery Low (<30%)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Calculating optimal route...</div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
